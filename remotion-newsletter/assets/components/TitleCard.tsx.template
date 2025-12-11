@@ -1,0 +1,203 @@
+/**
+ * TitleCard Component Template
+ *
+ * Animated title slide with gradient background and word-by-word text animation.
+ * Duration: 90 frames (3 seconds at 30fps)
+ *
+ * TEMPLATE VARIABLES (replace when generating):
+ * - {{TOPIC}}: The newsletter topic/title
+ * - {{DATE}}: Generated date string
+ * - {{PRIMARY_COLOR}}: Primary gradient color
+ * - {{SECONDARY_COLOR}}: Secondary gradient color
+ * - {{BACKGROUND_COLOR}}: Background color
+ * - {{TEXT_COLOR}}: Main text color
+ */
+
+import React, { useState } from "react";
+import {
+  AbsoluteFill,
+  interpolate,
+  spring,
+  useCurrentFrame,
+  useVideoConfig,
+  random,
+} from "remotion";
+
+const FONT_FAMILY = "SF Pro Text, Helvetica, Arial, sans-serif";
+
+interface TitleCardProps {
+  topic: string;
+  subtitle?: string;
+  date?: string;
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor?: string;
+  textColor?: string;
+}
+
+export const TitleCard: React.FC<TitleCardProps> = ({
+  topic,
+  subtitle,
+  date,
+  primaryColor,
+  secondaryColor,
+  backgroundColor = "#1E293B",
+  textColor = "#F8FAFC",
+}) => {
+  const frame = useCurrentFrame();
+  const { fps, width, height } = useVideoConfig();
+  const [gradientId] = useState(() => String(random(null)));
+
+  // Background gradient rotation
+  const gradientRotation = interpolate(frame, [0, 90], [0, 15]);
+
+  // Title animation - word by word
+  const words = topic.split(" ");
+
+  // Subtitle fade in
+  const subtitleOpacity = interpolate(frame, [40, 60], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // Date fade in
+  const dateOpacity = interpolate(frame, [50, 70], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // Overall scale entrance
+  const scaleProgress = spring({
+    frame,
+    fps,
+    config: { damping: 100, mass: 0.5 },
+  });
+  const containerScale = interpolate(scaleProgress, [0, 1], [0.95, 1]);
+
+  return (
+    <AbsoluteFill style={{ backgroundColor }}>
+      {/* Animated gradient background */}
+      <AbsoluteFill>
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          style={{
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            transform: `rotate(${gradientRotation}deg) scale(1.5)`,
+            opacity: 0.3,
+          }}
+        >
+          <defs>
+            <radialGradient id={gradientId} cx="50%" cy="50%" r="70%">
+              <stop offset="0%" stopColor={primaryColor} />
+              <stop offset="100%" stopColor={backgroundColor} />
+            </radialGradient>
+          </defs>
+          <rect
+            fill={`url(#${gradientId})`}
+            width={width * 2}
+            height={height * 2}
+            x={-width / 2}
+            y={-height / 2}
+          />
+        </svg>
+      </AbsoluteFill>
+
+      {/* Content container */}
+      <AbsoluteFill
+        style={{
+          justifyContent: "center",
+          alignItems: "center",
+          transform: `scale(${containerScale})`,
+        }}
+      >
+        {/* Main title - word by word animation */}
+        <h1
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 90,
+            fontWeight: "bold",
+            textAlign: "center",
+            color: textColor,
+            margin: 0,
+            padding: "0 100px",
+            lineHeight: 1.2,
+          }}
+        >
+          {words.map((word, i) => {
+            const delay = i * 5;
+            const scale = spring({
+              fps,
+              frame: frame - delay,
+              config: { damping: 200 },
+            });
+
+            return (
+              <span
+                key={i}
+                style={{
+                  display: "inline-block",
+                  marginRight: 20,
+                  transform: `scale(${scale})`,
+                }}
+              >
+                {word}
+              </span>
+            );
+          })}
+        </h1>
+
+        {/* Subtitle */}
+        {subtitle && (
+          <p
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 36,
+              color: secondaryColor,
+              marginTop: 30,
+              opacity: subtitleOpacity,
+              textAlign: "center",
+            }}
+          >
+            {subtitle}
+          </p>
+        )}
+
+        {/* Date */}
+        {date && (
+          <p
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 24,
+              color: textColor,
+              opacity: dateOpacity * 0.6,
+              marginTop: 20,
+              textAlign: "center",
+            }}
+          >
+            {date}
+          </p>
+        )}
+
+        {/* Decorative line */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 150,
+            width: interpolate(
+              spring({ frame: frame - 30, fps, config: { damping: 100 } }),
+              [0, 1],
+              [0, 200]
+            ),
+            height: 4,
+            background: `linear-gradient(90deg, ${primaryColor}, ${secondaryColor})`,
+            borderRadius: 2,
+          }}
+        />
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+export default TitleCard;
