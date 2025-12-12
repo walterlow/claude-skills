@@ -1,245 +1,272 @@
 ---
 name: remotion-newsletter
-description: Generate Remotion video newsletters and presentations from web search results. This skill should be used when the user asks to create a video newsletter, news summary video, topic presentation, or animated video content about a specific subject. It performs web searches, extracts key information, and generates professional Remotion compositions with animated slides.
+description: Generate cinematic Remotion video newsletters and presentations with professional motion design. This skill should be used when the user asks to create a video newsletter, news summary video, topic presentation, or animated video content. It combines web research with GSAP-inspired easing curves, kinetic typography, and signature transitions for broadcast-quality output.
 ---
 
 # Remotion Video Newsletter Generator
 
-This skill enables generation of professional video newsletters and presentations from web search results using Remotion.
+Create cinematic video newsletters with professional motion design principles inspired by GSAP, broadcast graphics, and modern editorial aesthetics.
+
+## Motion Design Philosophy
+
+### The 12 Principles Applied to Video
+
+1. **Anticipation**: Elements telegraph their movement before acting (scale down before scaling up)
+2. **Follow-through**: Motion continues slightly past the endpoint before settling
+3. **Overlapping Action**: Different elements animate at offset timings for organic feel
+4. **Slow In/Out**: Use exponential easing - never linear motion for UI elements
+5. **Arcs**: Curved paths feel more natural than straight lines
+6. **Secondary Action**: Supporting elements react to primary motion
+
+### Signature Motion Identity
+
+Every newsletter should have a recognizable motion signature:
+- **Entrance pattern**: How elements first appear (reveal, morph, cascade)
+- **Rhythm**: The pacing between animations (staccato, legato, syncopated)
+- **Punctuation**: Distinctive micro-animations that mark transitions
 
 ## Prerequisites
 
-- Remotion 4.x project (check for `remotion` in package.json)
-- Required dependencies: `remotion`, `@remotion/zod-types`, `zod`, `react`
+- Remotion 4.x project with `remotion` in package.json
+- Dependencies: `remotion`, `@remotion/zod-types`, `zod`, `react`
 - Node.js 18+ environment
 
 ## Workflow
 
-### Step 1: Gather User Requirements
+### Step 1: Understand the Creative Brief
 
-When the user provides a topic, clarify:
-1. **Style preference**: "news-summary" (text-focused, professional) or "visual-presentation" (image-heavy, dynamic)
-2. **Number of sections**: Typically 3-5 sections work best
-3. **Video duration preference**: Short (30s), Medium (1min), Long (2min+)
+Gather requirements with focus on aesthetic direction:
 
-### Step 2: Web Search and Data Collection
+1. **Topic & Tone**: What's the subject? (tech, finance, culture, sports)
+2. **Visual Style**:
+   - `cinematic-dark` - Film noir, dramatic shadows, elegant reveals
+   - `editorial-bold` - Magazine-style, strong typography, high contrast
+   - `broadcast-news` - Professional, clean, information-dense
+   - `social-native` - Punchy, vertical-friendly, attention-grabbing
+3. **Duration**: Short (30s), Medium (60s), Long (90s+)
+4. **Color Mood**: See `references/color-schemes.md` for cinematic palettes
 
-Use the WebSearch tool to find 5-8 recent sources on the topic:
+### Step 2: Research & Content Architecture
 
-```
-WebSearch: "[topic] latest news 2025" or "[topic] updates recent"
-```
-
-From each search result, extract:
-- **Headline**: The main title/finding
-- **Key Points**: 2-3 important facts or insights
-- **Source**: Name and URL for attribution
-
-### Step 3: Structure the Newsletter Data
-
-Organize search results into this structure:
+Use WebSearch for 5-8 recent sources. Structure for visual storytelling:
 
 ```typescript
-interface NewsletterData {
-  topic: string;
-  subtitle: string;
-  style: "news-summary" | "visual-presentation";
+interface NewsletterContent {
+  hook: string;              // Opening statement that grabs attention
   sections: Array<{
-    headline: string;
-    keyPoints: string[];
-    imageUrl?: string;
-    emphasis: "high" | "medium" | "low";
+    headline: string;        // 5-8 words max
+    subhead?: string;        // Context line
+    keyPoints: string[];     // 2-3 points, 10-15 words each
+    visualCue: 'stat' | 'quote' | 'comparison' | 'reveal';
+    emphasis: 'hero' | 'supporting' | 'detail';
   }>;
-  sources: Array<{
-    name: string;
-    url: string;
-  }>;
-  colorScheme: "blue" | "green" | "purple" | "orange";
+  callback: string;          // Return to opening theme
+  cta?: string;              // Call to action
 }
 ```
 
-### Step 4: Calculate Video Timing
+### Step 3: Motion Choreography
 
-Use these defaults (30fps):
-- **Title Card**: 90 frames (3 seconds)
-- **Content Slide**: 150 frames (5 seconds) per section
-- **Transitions**: 30 frames (1 second) between slides
-- **Outro**: 90 frames (3 seconds)
+Plan the animation sequence. See `references/motion-choreography.md` for patterns:
 
-**Total Duration Formula**:
 ```
-totalFrames = 90 + (sections.length * 150) + ((sections.length + 1) * 30) + 90
-```
-
-Example for 4 sections:
-```
-90 + (4 * 150) + (5 * 30) + 90 = 90 + 600 + 150 + 90 = 930 frames (31 seconds)
+TIMELINE STRUCTURE
+─────────────────────────────────────────────────────────────
+0s     Title Card: Logo bloom → Title cascade → Subtitle fade
+3s     Section 1:  Wipe reveal → Headline kinetic → Points stagger
+8s     Transition: Morph to next context
+8.5s   Section 2:  Scale in → Split headline → Points cascade
+...
+─────────────────────────────────────────────────────────────
 ```
 
-### Step 5: Generate Remotion Components
+### Step 4: Calculate Precise Timing
 
-Create the following files in the user's Remotion project:
-
-#### 5.1 Create Newsletter Directory
-```
-src/Newsletter/
-  ├── index.tsx           # Main composition
-  ├── TitleCard.tsx       # Opening slide
-  ├── ContentSlide.tsx    # Content sections
-  ├── TransitionSlide.tsx # Transitions
-  ├── OutroSlide.tsx      # Closing slide
-  └── constants.ts        # Colors, fonts, timing
-```
-
-#### 5.2 Generate Components Using Templates
-
-Use the component templates in `assets/components/`:
-- `TitleCard.tsx.template` - Animated title with gradient background
-- `ContentSlide.tsx.template` - Headline + bullet points with staggered animation
-- `TransitionSlide.tsx.template` - Smooth transitions between sections
-- `OutroSlide.tsx.template` - Sources list and closing message
-
-Read each template and customize with the newsletter data.
-
-#### 5.3 Create the Main Composition
-
-Generate `src/Newsletter/[TopicName]Newsletter.tsx` with:
+Use the frame calculator with 30fps base:
 
 ```typescript
-import { spring, AbsoluteFill, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
-import { z } from "zod";
-import { zColor } from "@remotion/zod-types";
-import { TitleCard } from "./TitleCard";
-import { ContentSlide } from "./ContentSlide";
-import { OutroSlide } from "./OutroSlide";
+// Timing constants (frames at 30fps)
+const TIMING = {
+  // Entrances
+  quickSnap: 8,      // ~0.27s - Icon pops
+  standard: 15,      // 0.5s - Text reveals
+  dramatic: 30,      // 1s - Hero elements
 
-// Use the schema from assets/schemas/newsletter-schema.ts
-export const newsletterSchema = z.object({
-  topic: z.string(),
-  sections: z.array(z.object({
-    headline: z.string(),
-    keyPoints: z.array(z.string()),
-  })),
-  primaryColor: zColor(),
-  secondaryColor: zColor(),
-});
+  // Holds (reading time)
+  headline: 45,      // 1.5s
+  bullet: 30,        // 1s per point
 
-export const Newsletter: React.FC<z.infer<typeof newsletterSchema>> = (props) => {
-  const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  // Transitions
+  microTransition: 10,  // 0.33s
+  transition: 20,       // 0.67s
+  sceneChange: 30,      // 1s
 
-  // Fade out at end
-  const opacity = interpolate(
-    frame,
-    [durationInFrames - 25, durationInFrames - 15],
-    [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-  );
+  // Slides
+  titleCard: 90,     // 3s
+  contentSlide: 150, // 5s
+  outro: 90,         // 3s
+};
 
-  return (
-    <AbsoluteFill style={{ backgroundColor: "#1E293B" }}>
-      <AbsoluteFill style={{ opacity }}>
-        {/* Title: frames 0-90 */}
-        <Sequence from={0} durationInFrames={90}>
-          <TitleCard {...props} />
-        </Sequence>
-
-        {/* Content slides with transitions */}
-        {props.sections.map((section, i) => (
-          <Sequence key={i} from={90 + i * 180} durationInFrames={180}>
-            <ContentSlide section={section} index={i} total={props.sections.length} />
-          </Sequence>
-        ))}
-
-        {/* Outro */}
-        <Sequence from={90 + props.sections.length * 180}>
-          <OutroSlide />
-        </Sequence>
-      </AbsoluteFill>
-    </AbsoluteFill>
-  );
+// Calculate total duration
+const calculateDuration = (sections: number) => {
+  return TIMING.titleCard +
+         (sections * TIMING.contentSlide) +
+         ((sections + 1) * TIMING.transition) +
+         TIMING.outro;
 };
 ```
 
-### Step 6: Register Composition in Root.tsx
+### Step 5: Generate Components
 
-Add the new composition to `src/Root.tsx`:
+Create files in `src/Newsletter/`:
 
-```typescript
-import { Newsletter, newsletterSchema } from "./Newsletter";
-
-// Inside RemotionRoot:
-<Composition
-  id="TopicNewsletter"
-  component={Newsletter}
-  durationInFrames={930}  // Calculated duration
-  fps={30}
-  width={1920}
-  height={1080}
-  schema={newsletterSchema}
-  defaultProps={{
-    topic: "Your Topic",
-    sections: [
-      { headline: "...", keyPoints: ["...", "..."] },
-    ],
-    primaryColor: "#2563EB",
-    secondaryColor: "#60A5FA",
-  }}
-/>
+```
+src/Newsletter/
+├── index.tsx              # Main composition
+├── TitleCard.tsx          # Cinematic opening
+├── ContentSlide.tsx       # Section with kinetic type
+├── TransitionSlide.tsx    # Signature transitions
+├── OutroSlide.tsx         # Memorable closing
+├── components/
+│   ├── KineticText.tsx    # Animated typography
+│   ├── RevealMask.tsx     # Clip-path reveals
+│   ├── ParticleField.tsx  # Ambient particles
+│   └── GlowText.tsx       # Luminous text effects
+├── utils/
+│   ├── easing.ts          # GSAP-style easing functions
+│   └── timing.ts          # Frame calculations
+└── styles/
+    └── constants.ts       # Colors, fonts, spacing
 ```
 
-### Step 7: Preview and Render
+Use templates from `assets/components/` as starting points.
 
-Guide the user to:
+### Step 6: Apply Animation Library
 
-1. **Preview**: `npm run dev` and select the composition in Remotion Studio
-2. **Render**: `npx remotion render TopicNewsletter --output=newsletter.mp4`
+Reference `references/animation-library.md` for:
 
-## Animation Patterns Reference
+**GSAP-Inspired Easing** (ported for Remotion):
+- `easeOutExpo` - Dramatic deceleration for reveals
+- `easeInOutCubic` - Smooth transitions
+- `easeOutBack` - Overshoot for emphasis
+- `easeOutElastic` - Bouncy attention-grabbers
 
-See `references/animation-library.md` for:
-- Spring configurations (snappy, smooth, bouncy)
-- Interpolation patterns (fade in/out, slide, scale)
-- Stagger timing (word-by-word, bullet points)
+**Kinetic Typography Patterns**:
+- Word-by-word reveals with stagger
+- Split-text character animations
+- Mask reveals (horizontal/vertical wipes)
+- Scale + blur combinations
 
-## Color Schemes Reference
+### Step 7: Register & Preview
 
-See `references/color-schemes.md` for tested palettes:
-- Professional Blue (default)
-- Tech Green
-- Creative Purple
-- Warm Orange
+Add to `src/Root.tsx`:
 
-## Style Guidelines
+```typescript
+import { Composition } from "remotion";
+import { Newsletter, newsletterSchema } from "./Newsletter";
 
-### News Summary Style
-- Clean typography with large headlines
-- Gradient backgrounds using SVG
-- Bullet points with icons
-- Minimal imagery, focus on text
-- Professional, broadcast news aesthetic
+export const RemotionRoot = () => (
+  <Composition
+    id="Newsletter"
+    component={Newsletter}
+    durationInFrames={750}  // Calculated
+    fps={30}
+    width={1920}
+    height={1080}
+    schema={newsletterSchema}
+    defaultProps={{
+      topic: "Weekly Tech Digest",
+      style: "cinematic-dark",
+      // ... other props
+    }}
+  />
+);
+```
 
-### Visual Presentation Style
-- Large background images (use Img from remotion)
-- Overlay text with text shadows
-- More dynamic animations
-- Social media / magazine aesthetic
+### Step 8: Render Commands
+
+```bash
+# Preview in browser
+npm run dev
+
+# Render to MP4 (H.264)
+npx remotion render Newsletter out/newsletter.mp4
+
+# Render at higher quality
+npx remotion render Newsletter out/newsletter.mp4 --crf 18
+
+# Render specific section (for testing)
+npx remotion render Newsletter out/test.mp4 --frames=0-90
+```
+
+## Reference Documents
+
+| Document | Purpose |
+|----------|---------|
+| `references/animation-library.md` | GSAP-inspired easing curves, motion presets |
+| `references/motion-choreography.md` | Timeline patterns, stagger systems |
+| `references/typography.md` | Font pairings, kinetic text techniques |
+| `references/color-schemes.md` | Cinematic palettes with atmospheric depth |
+| `references/visual-effects.md` | Particles, glows, grain overlays |
+
+## Style Guidelines by Type
+
+### Cinematic Dark
+- Deep blacks with selective color accents
+- Elegant serif/sans pairings (Playfair + DM Sans)
+- Long easing curves (expo, cubic)
+- Subtle film grain overlay
+- Dramatic reveals and light blooms
+
+### Editorial Bold
+- High contrast black/white with accent color
+- Strong geometric sans (Bebas Neue, Oswald)
+- Snappy timing with hard cuts
+- Aggressive scale animations
+- Bold graphic shapes as transitions
+
+### Broadcast News
+- Professional blue/gray palette
+- Clean sans-serif (Inter, Source Sans)
+- Consistent moderate timing
+- Lower-third graphics
+- Data visualizations and charts
+
+### Social Native
+- Vibrant colors, gradients
+- Rounded modern fonts (Circular, Poppins)
+- Quick punchy animations
+- Vertical-safe compositions (1080x1920 variant)
+- Emoji and reaction elements
 
 ## Best Practices
 
-1. **Always use hooks**: `useCurrentFrame()` and `useVideoConfig()` for timing
-2. **Spring for entrances**: Use `spring()` with appropriate damping
-3. **Interpolate for fades**: Use with `extrapolateLeft/Right: "clamp"`
-4. **Unique gradient IDs**: Use `random(null)` for SVG gradient IDs
-5. **Sequence for timing**: Wrap components in `<Sequence from={frame}>`
-6. **AbsoluteFill for layers**: Stack elements using `<AbsoluteFill>`
+### Performance
+- Use `staticFile()` for fonts, not Google Fonts CDN
+- Precompute heavy calculations outside render loop
+- Limit particle count to 50-100 for smooth playback
+- Use PNG sequence for complex effects
 
-## Example Usage
+### Visual Quality
+- Always clamp interpolation to avoid overshoot artifacts
+- Add slight motion blur via scale/opacity for fast movements
+- Use gradient meshes instead of flat backgrounds
+- Apply subtle vignette for depth
 
-User: "Create a video newsletter about AI developments in 2025"
+### Motion Feel
+- Never use linear easing for UI elements
+- Stagger siblings by 3-5 frames minimum
+- Hold elements in view 1.5s minimum for readability
+- Exit animations should be faster than entrances (0.7x)
 
-1. Search for "AI developments 2025 latest news"
-2. Extract 4-5 key stories with headlines and points
-3. Generate Newsletter composition with sections
-4. Register in Root.tsx with calculated duration
-5. Guide user to preview with `npm run dev`
+## Example Session
+
+User: "Create a video newsletter about the latest developments in AI agents"
+
+1. **Research**: Search "AI agents news December 2025"
+2. **Structure**: 4 sections - Overview, Key Players, Applications, Future
+3. **Style**: Editorial Bold (tech topic, high energy)
+4. **Duration**: 45s (intro 3s, 4 sections × 8s, outro 3s, transitions)
+5. **Generate**: Create components using templates
+6. **Choreograph**: Staggered reveals, data callouts, tech-themed transitions
+7. **Output**: `npx remotion render AIAgentsNewsletter`

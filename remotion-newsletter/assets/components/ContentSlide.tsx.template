@@ -1,330 +1,620 @@
 /**
  * ContentSlide Component Template
  *
- * Content section with animated headline and staggered bullet points.
- * Duration: 150-180 frames (5-6 seconds at 30fps)
+ * Dynamic content section with kinetic typography, staggered reveals,
+ * and layered motion design. Duration: 150 frames (5 seconds at 30fps)
  *
- * Supports two styles:
- * - news-summary: Text-focused with gradient accent
- * - visual-presentation: Image background with overlay
+ * Animation Sequence:
+ * 0-15:   Section label fade
+ * 5-35:   Headline mask reveal with scale
+ * 25-45:  Subhead slide up
+ * 35+:    Bullet points cascade (15 frames apart)
+ * 80+:    Visual accent elements
+ *
+ * Supports two modes:
+ * - news-summary: Text-focused with gradient accents
+ * - visual-presentation: Image backgrounds with overlay
  */
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   AbsoluteFill,
   Img,
   interpolate,
-  spring,
   useCurrentFrame,
   useVideoConfig,
   random,
 } from "remotion";
 
-const FONT_FAMILY = "SF Pro Text, Helvetica, Arial, sans-serif";
+// ═══════════════════════════════════════════════════════════════
+// GSAP-INSPIRED EASING FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+
+const easeOutExpo = (t: number): number =>
+  t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+
+const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+
+const easeOutBack = (t: number): number => {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+};
+
+const easeInCubic = (t: number): number => t * t * t;
+
+// ═══════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════
 
 interface Section {
   headline: string;
+  subhead?: string;
   keyPoints: string[];
   imageUrl?: string;
+  stat?: { value: string; label: string };
 }
 
 interface ContentSlideProps {
   section: Section;
   index: number;
   total: number;
+  style?: "news-summary" | "visual-presentation";
+  primaryColor?: string;
+  secondaryColor?: string;
+  backgroundColor?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STYLE PRESETS
+// ═══════════════════════════════════════════════════════════════
+
+const defaultColors = {
+  bg: "#0A0A0F",
+  bgElevated: "#12121A",
+  text: "#FFFFFF",
+  textSecondary: "#E4E4E7",
+  textMuted: "#A1A1AA",
+  primary: "#6366F1",
+  secondary: "#8B5CF6",
+  glow: "#818CF8",
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SUB-COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+
+/** Section label with fade animation */
+const SectionLabel: React.FC<{
+  index: number;
+  total: number;
+  color: string;
+}> = ({ index, total, color }) => {
+  const frame = useCurrentFrame();
+  const progress = Math.min(frame / 15, 1);
+  const eased = easeOutCubic(progress);
+
+  return (
+    <p
+      style={{
+        fontFamily: '"DM Sans", sans-serif',
+        fontSize: 18,
+        fontWeight: 600,
+        color,
+        margin: 0,
+        marginBottom: 20,
+        opacity: eased,
+        letterSpacing: 3,
+        textTransform: "uppercase",
+      }}
+    >
+      {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+    </p>
+  );
+};
+
+/** Headline with mask reveal + scale effect */
+const AnimatedHeadline: React.FC<{
+  text: string;
+  startFrame?: number;
+  color: string;
+}> = ({ text, startFrame = 5, color }) => {
+  const frame = useCurrentFrame();
+
+  const animationStart = Math.max(0, frame - startFrame);
+  const progress = Math.min(animationStart / 30, 1);
+  const eased = easeOutExpo(progress);
+
+  // Split into lines for multi-line headlines
+  const words = text.split(" ");
+  const midpoint = Math.ceil(words.length / 2);
+  const lines =
+    words.length > 6
+      ? [words.slice(0, midpoint).join(" "), words.slice(midpoint).join(" ")]
+      : [text];
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      {lines.map((line, lineIndex) => {
+        const lineDelay = lineIndex * 8;
+        const lineStart = Math.max(0, frame - startFrame - lineDelay);
+        const lineProgress = Math.min(lineStart / 25, 1);
+        const lineEased = easeOutExpo(lineProgress);
+
+        return (
+          <div
+            key={lineIndex}
+            style={{ overflow: "hidden", marginBottom: 8 }}
+          >
+            <h2
+              style={{
+                fontFamily: '"Playfair Display", Georgia, serif',
+                fontSize: 72,
+                fontWeight: 700,
+                color,
+                margin: 0,
+                lineHeight: 1.1,
+                transform: `translateY(${(1 - lineEased) * 100}%) scale(${0.95 + lineEased * 0.05})`,
+                opacity: lineEased,
+              }}
+            >
+              {line}
+            </h2>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/** Subhead with slide up animation */
+const AnimatedSubhead: React.FC<{
+  text: string;
+  startFrame?: number;
+  color: string;
+}> = ({ text, startFrame = 25, color }) => {
+  const frame = useCurrentFrame();
+
+  const animationStart = Math.max(0, frame - startFrame);
+  const progress = Math.min(animationStart / 20, 1);
+  const eased = easeOutCubic(progress);
+
+  return (
+    <p
+      style={{
+        fontFamily: '"DM Sans", sans-serif',
+        fontSize: 28,
+        fontWeight: 400,
+        color,
+        margin: 0,
+        marginBottom: 40,
+        opacity: eased,
+        transform: `translateY(${(1 - eased) * 20}px)`,
+        lineHeight: 1.5,
+      }}
+    >
+      {text}
+    </p>
+  );
+};
+
+/** Animated bullet point */
+const BulletPoint: React.FC<{
+  text: string;
+  index: number;
+  startFrame: number;
   primaryColor: string;
   secondaryColor: string;
-  backgroundColor?: string;
-  textColor?: string;
-  style?: "news-summary" | "visual-presentation";
-}
+  textColor: string;
+}> = ({ text, index, startFrame, primaryColor, secondaryColor, textColor }) => {
+  const frame = useCurrentFrame();
+  const [gradientId] = useState(() => `bullet-${random(null)}-${index}`);
+
+  // Stagger: each bullet 12 frames apart
+  const delay = startFrame + index * 12;
+  const animationStart = Math.max(0, frame - delay);
+  const progress = Math.min(animationStart / 20, 1);
+  const eased = easeOutBack(progress);
+
+  // Icon pulse after settling
+  const settled = progress === 1;
+  const iconScale = settled
+    ? 1 + Math.sin((frame - delay - 20) * 0.1) * 0.05
+    : eased;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        marginBottom: 24,
+        opacity: eased,
+        transform: `translateX(${(1 - eased) * -40}px)`,
+      }}
+    >
+      {/* Animated bullet icon */}
+      <div
+        style={{
+          width: 24,
+          height: 24,
+          marginRight: 20,
+          marginTop: 6,
+          flexShrink: 0,
+          transform: `scale(${iconScale})`,
+        }}
+      >
+        <svg viewBox="0 0 24 24" width={24} height={24}>
+          <defs>
+            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={primaryColor} />
+              <stop offset="100%" stopColor={secondaryColor} />
+            </linearGradient>
+          </defs>
+          <circle
+            cx={12}
+            cy={12}
+            r={10}
+            fill={`url(#${gradientId})`}
+            style={{
+              filter: `drop-shadow(0 0 6px ${primaryColor}80)`,
+            }}
+          />
+          <path
+            d="M8 12l3 3 5-6"
+            stroke="#FFFFFF"
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              strokeDasharray: 20,
+              strokeDashoffset: (1 - eased) * 20,
+            }}
+          />
+        </svg>
+      </div>
+
+      {/* Text */}
+      <p
+        style={{
+          fontFamily: '"DM Sans", sans-serif',
+          fontSize: 32,
+          fontWeight: 400,
+          color: textColor,
+          margin: 0,
+          lineHeight: 1.5,
+          opacity: 0.95,
+        }}
+      >
+        {text}
+      </p>
+    </div>
+  );
+};
+
+/** Stat callout with count-up animation */
+const StatCallout: React.FC<{
+  value: string;
+  label: string;
+  startFrame: number;
+  primaryColor: string;
+}> = ({ value, label, startFrame, primaryColor }) => {
+  const frame = useCurrentFrame();
+
+  const animationStart = Math.max(0, frame - startFrame);
+  const progress = Math.min(animationStart / 30, 1);
+  const eased = easeOutExpo(progress);
+
+  // Extract number from value for count-up
+  const numMatch = value.match(/[\d.]+/);
+  const numValue = numMatch ? parseFloat(numMatch[0]) : 0;
+  const prefix = value.substring(0, value.indexOf(numMatch?.[0] || ""));
+  const suffix = value.substring(
+    value.indexOf(numMatch?.[0] || "") + (numMatch?.[0]?.length || 0)
+  );
+
+  const displayNum = Math.round(numValue * eased);
+
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: 40,
+        opacity: eased,
+        transform: `scale(${0.9 + eased * 0.1})`,
+      }}
+    >
+      <p
+        style={{
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: 80,
+          fontWeight: 700,
+          color: primaryColor,
+          margin: 0,
+          textShadow: `0 0 40px ${primaryColor}60`,
+        }}
+      >
+        {prefix}
+        {displayNum}
+        {suffix}
+      </p>
+      <p
+        style={{
+          fontFamily: '"DM Sans", sans-serif',
+          fontSize: 24,
+          color: "#A1A1AA",
+          marginTop: 10,
+          textTransform: "uppercase",
+          letterSpacing: 2,
+        }}
+      >
+        {label}
+      </p>
+    </div>
+  );
+};
+
+/** Progress bar showing position in newsletter */
+const ProgressBar: React.FC<{
+  current: number;
+  total: number;
+  primaryColor: string;
+  secondaryColor: string;
+}> = ({ current, total, primaryColor, secondaryColor }) => {
+  const frame = useCurrentFrame();
+  const [gradientId] = useState(() => `progress-${random(null)}`);
+
+  const progress = Math.min(frame / 30, 1);
+  const eased = easeOutExpo(progress);
+
+  const percentage = ((current + 1) / total) * 100;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 50,
+        left: 120,
+        right: 120,
+        height: 4,
+        backgroundColor: "rgba(255,255,255,0.1)",
+        borderRadius: 2,
+        overflow: "hidden",
+      }}
+    >
+      <svg
+        style={{
+          position: "absolute",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={primaryColor} />
+            <stop offset="100%" stopColor={secondaryColor} />
+          </linearGradient>
+        </defs>
+        <rect
+          x={0}
+          y={0}
+          width={`${percentage * eased}%`}
+          height={4}
+          fill={`url(#${gradientId})`}
+          style={{
+            filter: `drop-shadow(0 0 8px ${primaryColor})`,
+          }}
+        />
+      </svg>
+    </div>
+  );
+};
+
+/** Gradient accent bar on left edge */
+const AccentBar: React.FC<{
+  primaryColor: string;
+  secondaryColor: string;
+}> = ({ primaryColor, secondaryColor }) => {
+  const frame = useCurrentFrame();
+  const { height } = useVideoConfig();
+  const [gradientId] = useState(() => `accent-${random(null)}`);
+
+  const progress = Math.min(frame / 25, 1);
+  const eased = easeOutExpo(progress);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 6,
+        overflow: "hidden",
+      }}
+    >
+      <svg
+        viewBox={`0 0 6 ${height}`}
+        style={{ width: 6, height: "100%" }}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={primaryColor} />
+            <stop offset="100%" stopColor={secondaryColor} />
+          </linearGradient>
+        </defs>
+        <rect
+          x={0}
+          y={height * (1 - eased)}
+          width={6}
+          height={height * eased}
+          fill={`url(#${gradientId})`}
+          style={{
+            filter: `drop-shadow(0 0 10px ${primaryColor})`,
+          }}
+        />
+      </svg>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════
 
 export const ContentSlide: React.FC<ContentSlideProps> = ({
   section,
   index,
   total,
-  primaryColor,
-  secondaryColor,
-  backgroundColor = "#1E293B",
-  textColor = "#F8FAFC",
   style = "news-summary",
+  primaryColor = defaultColors.primary,
+  secondaryColor = defaultColors.secondary,
+  backgroundColor = defaultColors.bg,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
-  const [gradientId] = useState(() => String(random(null)));
+  const { durationInFrames } = useVideoConfig();
 
-  // Headline animation
-  const headlineProgress = spring({
-    frame,
-    fps,
-    config: { damping: 100 },
-  });
-  const headlineScale = interpolate(headlineProgress, [0, 1], [0.9, 1]);
-  const headlineOpacity = interpolate(headlineProgress, [0, 1], [0, 1]);
-  const headlineY = interpolate(headlineProgress, [0, 1], [30, 0]);
+  // Exit animation
+  const exitStart = durationInFrames - 15;
+  const exitProgress = Math.max(0, frame - exitStart) / 12;
+  const exitOpacity = 1 - easeInCubic(Math.min(exitProgress, 1));
 
-  // Progress indicator
-  const progressWidth = ((index + 1) / total) * 100;
-
+  // Visual presentation mode with image background
   if (style === "visual-presentation" && section.imageUrl) {
     return (
       <AbsoluteFill>
-        {/* Background image */}
-        <Img
-          src={section.imageUrl}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
+        {/* Background image with parallax */}
+        <AbsoluteFill>
+          <Img
+            src={section.imageUrl}
+            style={{
+              width: "110%",
+              height: "110%",
+              objectFit: "cover",
+              transform: `scale(1.1) translateY(${frame * 0.1}px)`,
+            }}
+          />
+        </AbsoluteFill>
 
-        {/* Dark overlay */}
+        {/* Dark gradient overlay */}
         <AbsoluteFill
           style={{
-            background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.5) 100%)",
+            background: `linear-gradient(
+              to top,
+              rgba(0,0,0,0.95) 0%,
+              rgba(0,0,0,0.7) 40%,
+              rgba(0,0,0,0.4) 70%,
+              rgba(0,0,0,0.6) 100%
+            )`,
           }}
         />
 
-        {/* Content */}
+        {/* Content at bottom */}
         <AbsoluteFill
           style={{
             justifyContent: "flex-end",
             padding: 80,
+            opacity: exitOpacity,
           }}
         >
-          {/* Headline */}
-          <h2
-            style={{
-              fontFamily: FONT_FAMILY,
-              fontSize: 72,
-              fontWeight: "bold",
-              color: textColor,
-              margin: 0,
-              marginBottom: 30,
-              transform: `translateY(${headlineY}px) scale(${headlineScale})`,
-              opacity: headlineOpacity,
-              textShadow: "0 4px 20px rgba(0,0,0,0.8)",
-              lineHeight: 1.2,
-            }}
-          >
-            {section.headline}
-          </h2>
+          <SectionLabel index={index} total={total} color={primaryColor} />
+          <AnimatedHeadline text={section.headline} color="#FFFFFF" />
 
-          {/* Key points */}
-          <div style={{ marginBottom: 60 }}>
-            {section.keyPoints.map((point, i) => {
-              const delay = 20 + i * 15;
-              const pointProgress = spring({
-                frame: frame - delay,
-                fps,
-                config: { damping: 100 },
-              });
-              const pointOpacity = interpolate(pointProgress, [0, 1], [0, 1]);
-              const pointX = interpolate(pointProgress, [0, 1], [-30, 0]);
-
-              return (
-                <div
+          {section.keyPoints.length > 0 && (
+            <div style={{ marginBottom: 60 }}>
+              {section.keyPoints.slice(0, 3).map((point, i) => (
+                <BulletPoint
                   key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    marginBottom: 15,
-                    opacity: pointOpacity,
-                    transform: `translateX(${pointX}px)`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: primaryColor,
-                      marginTop: 12,
-                      marginRight: 20,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <p
-                    style={{
-                      fontFamily: FONT_FAMILY,
-                      fontSize: 32,
-                      color: textColor,
-                      margin: 0,
-                      textShadow: "0 2px 10px rgba(0,0,0,0.5)",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {point}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Progress bar */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 40,
-              left: 80,
-              right: 80,
-              height: 4,
-              backgroundColor: "rgba(255,255,255,0.2)",
-              borderRadius: 2,
-            }}
-          >
-            <div
-              style={{
-                width: `${progressWidth}%`,
-                height: "100%",
-                background: `linear-gradient(90deg, ${primaryColor}, ${secondaryColor})`,
-                borderRadius: 2,
-              }}
-            />
-          </div>
+                  text={point}
+                  index={i}
+                  startFrame={40}
+                  primaryColor={primaryColor}
+                  secondaryColor={secondaryColor}
+                  textColor="#FFFFFF"
+                />
+              ))}
+            </div>
+          )}
         </AbsoluteFill>
+
+        <ProgressBar
+          current={index}
+          total={total}
+          primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
+        />
       </AbsoluteFill>
     );
   }
 
-  // News Summary style (text-focused)
+  // News summary mode (default)
   return (
     <AbsoluteFill style={{ backgroundColor }}>
-      {/* Accent gradient */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 8,
-        }}
-      >
-        <svg viewBox={`0 0 8 ${height}`} style={{ width: 8, height: "100%" }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor={primaryColor} />
-              <stop offset="100%" stopColor={secondaryColor} />
-            </linearGradient>
-          </defs>
-          <rect fill={`url(#${gradientId})`} width={8} height={height} />
-        </svg>
-      </div>
+      {/* Accent bar */}
+      <AccentBar primaryColor={primaryColor} secondaryColor={secondaryColor} />
 
-      {/* Content */}
+      {/* Ambient glow */}
       <AbsoluteFill
         style={{
-          padding: "100px 120px 100px 150px",
+          background: `radial-gradient(ellipse at 20% 30%, ${primaryColor}15 0%, transparent 50%)`,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Main content */}
+      <AbsoluteFill
+        style={{
+          padding: "80px 120px 80px 140px",
           justifyContent: "center",
+          opacity: exitOpacity,
         }}
       >
-        {/* Section number */}
-        <p
-          style={{
-            fontFamily: FONT_FAMILY,
-            fontSize: 20,
-            color: primaryColor,
-            margin: 0,
-            marginBottom: 20,
-            opacity: headlineOpacity,
-            letterSpacing: 2,
-            textTransform: "uppercase",
-          }}
-        >
-          Section {index + 1} of {total}
-        </p>
+        <SectionLabel index={index} total={total} color={primaryColor} />
 
-        {/* Headline */}
-        <h2
-          style={{
-            fontFamily: FONT_FAMILY,
-            fontSize: 64,
-            fontWeight: "bold",
-            color: textColor,
-            margin: 0,
-            marginBottom: 50,
-            transform: `translateY(${headlineY}px) scale(${headlineScale})`,
-            opacity: headlineOpacity,
-            lineHeight: 1.2,
-          }}
-        >
-          {section.headline}
-        </h2>
+        <AnimatedHeadline text={section.headline} color="#FFFFFF" />
 
-        {/* Key points with staggered animation */}
-        <div>
-          {section.keyPoints.map((point, i) => {
-            const delay = 20 + i * 15;
-            const pointProgress = spring({
-              frame: frame - delay,
-              fps,
-              config: { damping: 100 },
-            });
-            const pointOpacity = interpolate(pointProgress, [0, 1], [0, 1]);
-            const pointX = interpolate(pointProgress, [0, 1], [-30, 0]);
+        {section.subhead && (
+          <AnimatedSubhead text={section.subhead} color="#A1A1AA" />
+        )}
 
-            return (
-              <div
+        {/* Two-column layout for stat + bullets */}
+        <div style={{ display: "flex", gap: 60 }}>
+          {/* Bullets */}
+          <div style={{ flex: 1 }}>
+            {section.keyPoints.map((point, i) => (
+              <BulletPoint
                 key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  marginBottom: 25,
-                  opacity: pointOpacity,
-                  transform: `translateX(${pointX}px)`,
-                }}
-              >
-                <div
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 6,
-                    background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                    marginTop: 14,
-                    marginRight: 25,
-                    flexShrink: 0,
-                  }}
-                />
-                <p
-                  style={{
-                    fontFamily: FONT_FAMILY,
-                    fontSize: 36,
-                    color: textColor,
-                    margin: 0,
-                    lineHeight: 1.5,
-                    opacity: 0.9,
-                  }}
-                >
-                  {point}
-                </p>
-              </div>
-            );
-          })}
+                text={point}
+                index={i}
+                startFrame={35}
+                primaryColor={primaryColor}
+                secondaryColor={secondaryColor}
+                textColor="#E4E4E7"
+              />
+            ))}
+          </div>
+
+          {/* Optional stat callout */}
+          {section.stat && (
+            <div style={{ width: 300 }}>
+              <StatCallout
+                value={section.stat.value}
+                label={section.stat.label}
+                startFrame={50}
+                primaryColor={primaryColor}
+              />
+            </div>
+          )}
         </div>
       </AbsoluteFill>
 
       {/* Progress bar */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 50,
-          left: 150,
-          right: 120,
-          height: 4,
-          backgroundColor: "rgba(255,255,255,0.1)",
-          borderRadius: 2,
-        }}
-      >
-        <div
-          style={{
-            width: `${progressWidth}%`,
-            height: "100%",
-            background: `linear-gradient(90deg, ${primaryColor}, ${secondaryColor})`,
-            borderRadius: 2,
-          }}
-        />
-      </div>
+      <ProgressBar
+        current={index}
+        total={total}
+        primaryColor={primaryColor}
+        secondaryColor={secondaryColor}
+      />
     </AbsoluteFill>
   );
 };

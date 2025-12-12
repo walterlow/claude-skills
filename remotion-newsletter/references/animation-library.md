@@ -1,287 +1,543 @@
 # Animation Library Reference
 
-Pre-configured animation presets for video newsletters.
+Professional motion design patterns with GSAP-inspired easing curves ported for Remotion's frame-based animation system.
 
-## Spring Configurations
+## GSAP-Style Easing Functions
 
-### Snappy (Quick Entrances)
-Fast response, minimal overshoot. Use for UI elements, buttons, icons.
+These easing functions accept a progress value (0-1) and return a transformed value. Use them with Remotion's `interpolate()` for professional motion.
+
+### Easing Utility Module
+
+Create `src/Newsletter/utils/easing.ts`:
+
 ```typescript
-const snappy = spring({
-  frame,
-  fps,
-  config: {
-    damping: 200,
-    mass: 0.5,
-    stiffness: 100,
-  },
-});
+/**
+ * GSAP-Inspired Easing Functions for Remotion
+ *
+ * Usage:
+ * const progress = frame / duration;
+ * const eased = easeOutExpo(progress);
+ * const value = interpolate(eased, [0, 1], [startValue, endValue]);
+ */
+
+// ═══════════════════════════════════════════════════════════════
+// EXPONENTIAL - Dramatic, cinematic feel
+// ═══════════════════════════════════════════════════════════════
+
+/** Slow start, explosive finish - great for reveals */
+export const easeInExpo = (t: number): number =>
+  t === 0 ? 0 : Math.pow(2, 10 * t - 10);
+
+/** Explosive start, gentle landing - THE signature reveal ease */
+export const easeOutExpo = (t: number): number =>
+  t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+
+/** Smooth acceleration/deceleration - scene transitions */
+export const easeInOutExpo = (t: number): number =>
+  t === 0 ? 0 :
+  t === 1 ? 1 :
+  t < 0.5 ? Math.pow(2, 20 * t - 10) / 2 :
+  (2 - Math.pow(2, -20 * t + 10)) / 2;
+
+// ═══════════════════════════════════════════════════════════════
+// CUBIC - Professional, refined motion
+// ═══════════════════════════════════════════════════════════════
+
+/** Subtle slow start */
+export const easeInCubic = (t: number): number => t * t * t;
+
+/** Subtle deceleration - text reveals */
+export const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+
+/** Balanced S-curve - slides, transitions */
+export const easeInOutCubic = (t: number): number =>
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+// ═══════════════════════════════════════════════════════════════
+// QUART/QUINT - More dramatic versions of cubic
+// ═══════════════════════════════════════════════════════════════
+
+export const easeOutQuart = (t: number): number => 1 - Math.pow(1 - t, 4);
+export const easeOutQuint = (t: number): number => 1 - Math.pow(1 - t, 5);
+export const easeInOutQuart = (t: number): number =>
+  t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+
+// ═══════════════════════════════════════════════════════════════
+// BACK - Overshoot for emphasis and playfulness
+// ═══════════════════════════════════════════════════════════════
+
+const c1 = 1.70158;
+const c2 = c1 * 1.525;
+const c3 = c1 + 1;
+
+/** Pulls back before launching forward */
+export const easeInBack = (t: number): number =>
+  c3 * t * t * t - c1 * t * t;
+
+/** Overshoots then settles - buttons, icons, emphasis */
+export const easeOutBack = (t: number): number =>
+  1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+
+/** Pull back, overshoot, settle - dramatic entrances */
+export const easeInOutBack = (t: number): number =>
+  t < 0.5
+    ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+    : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
+
+// ═══════════════════════════════════════════════════════════════
+// ELASTIC - Springy, attention-grabbing
+// ═══════════════════════════════════════════════════════════════
+
+const c4 = (2 * Math.PI) / 3;
+const c5 = (2 * Math.PI) / 4.5;
+
+/** Elastic snap at end - notifications, badges */
+export const easeOutElastic = (t: number): number =>
+  t === 0 ? 0 :
+  t === 1 ? 1 :
+  Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+
+/** Full elastic motion - playful elements */
+export const easeInOutElastic = (t: number): number =>
+  t === 0 ? 0 :
+  t === 1 ? 1 :
+  t < 0.5
+    ? -(Math.pow(2, 20 * t - 10) * Math.sin((20 * t - 11.125) * c5)) / 2
+    : (Math.pow(2, -20 * t + 10) * Math.sin((20 * t - 11.125) * c5)) / 2 + 1;
+
+// ═══════════════════════════════════════════════════════════════
+// BOUNCE - Physical bounce effect
+// ═══════════════════════════════════════════════════════════════
+
+const n1 = 7.5625;
+const d1 = 2.75;
+
+/** Bounces at landing - physical objects */
+export const easeOutBounce = (t: number): number => {
+  if (t < 1 / d1) return n1 * t * t;
+  if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
+  if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
+  return n1 * (t -= 2.625 / d1) * t + 0.984375;
+};
+
+export const easeInBounce = (t: number): number =>
+  1 - easeOutBounce(1 - t);
+
+// ═══════════════════════════════════════════════════════════════
+// SINE - Gentle, organic motion
+// ═══════════════════════════════════════════════════════════════
+
+export const easeInSine = (t: number): number =>
+  1 - Math.cos((t * Math.PI) / 2);
+
+export const easeOutSine = (t: number): number =>
+  Math.sin((t * Math.PI) / 2);
+
+export const easeInOutSine = (t: number): number =>
+  -(Math.cos(Math.PI * t) - 1) / 2;
+
+// ═══════════════════════════════════════════════════════════════
+// CIRC - Circular motion, smooth arcs
+// ═══════════════════════════════════════════════════════════════
+
+export const easeOutCirc = (t: number): number =>
+  Math.sqrt(1 - Math.pow(t - 1, 2));
+
+export const easeInOutCirc = (t: number): number =>
+  t < 0.5
+    ? (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / 2
+    : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2;
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOM CUBIC BEZIER
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Custom cubic bezier easing
+ * Attempt to match CSS cubic-bezier(x1, y1, x2, y2)
+ */
+export const cubicBezier = (
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+) => (t: number): number => {
+  // Newton-Raphson iteration to solve for parameter
+  const epsilon = 1e-6;
+  let guess = t;
+
+  for (let i = 0; i < 8; i++) {
+    const currentX = bezierPoint(guess, x1, x2);
+    const currentSlope = bezierSlope(guess, x1, x2);
+
+    if (Math.abs(currentX - t) < epsilon) break;
+    if (Math.abs(currentSlope) < epsilon) break;
+
+    guess -= (currentX - t) / currentSlope;
+  }
+
+  return bezierPoint(guess, y1, y2);
+};
+
+const bezierPoint = (t: number, p1: number, p2: number): number => {
+  const c = 3 * p1;
+  const b = 3 * (p2 - p1) - c;
+  const a = 1 - c - b;
+  return ((a * t + b) * t + c) * t;
+};
+
+const bezierSlope = (t: number, p1: number, p2: number): number => {
+  const c = 3 * p1;
+  const b = 3 * (p2 - p1) - c;
+  const a = 1 - c - b;
+  return (3 * a * t + 2 * b) * t + c;
+};
+
+// ═══════════════════════════════════════════════════════════════
+// PRESET COMBINATIONS (Named Motion Styles)
+// ═══════════════════════════════════════════════════════════════
+
+/** Apple-style smooth motion */
+export const appleEase = cubicBezier(0.25, 0.1, 0.25, 1);
+
+/** Material Design standard */
+export const materialStandard = cubicBezier(0.4, 0, 0.2, 1);
+
+/** Material Design deceleration */
+export const materialDecel = cubicBezier(0, 0, 0.2, 1);
+
+/** Material Design acceleration */
+export const materialAccel = cubicBezier(0.4, 0, 1, 1);
+
+/** Framer Motion smooth */
+export const framerSmooth = cubicBezier(0.4, 0, 0, 1);
+
+/** Dramatic cinematic reveal */
+export const cinematicReveal = cubicBezier(0.16, 1, 0.3, 1);
+
+/** Snappy UI response */
+export const snappy = cubicBezier(0.2, 0, 0, 1);
 ```
 
-### Smooth (Title Text)
-Balanced movement, professional feel. Use for headlines, main content.
+## Using Easing with Remotion
+
+### Basic Pattern
+
 ```typescript
-const smooth = spring({
-  frame,
-  fps,
-  config: {
-    damping: 100,
-  },
-});
-```
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { easeOutExpo } from "./utils/easing";
 
-### Bouncy (Emphasis)
-Noticeable overshoot, playful. Use for highlights, call-to-actions.
-```typescript
-const bouncy = spring({
-  frame,
-  fps,
-  config: {
-    damping: 10,
-    mass: 0.5,
-    stiffness: 100,
-  },
-});
-```
+const MyComponent = () => {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
 
-### Gentle (Backgrounds)
-Slow, subtle movement. Use for background elements, ambient animation.
-```typescript
-const gentle = spring({
-  frame,
-  fps,
-  config: {
-    damping: 100,
-    mass: 2,
-  },
-});
-```
+  // Raw progress (0 to 1)
+  const progress = Math.min(frame / 30, 1); // 30-frame animation
 
-### Heavy (Large Elements)
-Weighty feel, dramatic. Use for large graphics, logo reveals.
-```typescript
-const heavy = spring({
-  frame,
-  fps,
-  config: {
-    damping: 50,
-    mass: 3,
-  },
-});
-```
+  // Apply easing
+  const easedProgress = easeOutExpo(progress);
 
-## Interpolation Presets
+  // Map to actual values
+  const opacity = interpolate(easedProgress, [0, 1], [0, 1]);
+  const translateY = interpolate(easedProgress, [0, 1], [50, 0]);
+  const scale = interpolate(easedProgress, [0, 1], [0.8, 1]);
 
-### Fade In (Standard)
-30 frames = 1 second at 30fps
-```typescript
-const fadeIn = interpolate(frame, [0, 30], [0, 1], {
-  extrapolateLeft: "clamp",
-  extrapolateRight: "clamp",
-});
-```
-
-### Fade In (Quick)
-15 frames = 0.5 seconds
-```typescript
-const fadeInQuick = interpolate(frame, [0, 15], [0, 1], {
-  extrapolateLeft: "clamp",
-  extrapolateRight: "clamp",
-});
-```
-
-### Fade Out (End of Video)
-Starts 25 frames before end, completes 15 frames before end
-```typescript
-const fadeOut = interpolate(
-  frame,
-  [durationInFrames - 25, durationInFrames - 15],
-  [1, 0],
-  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-);
-```
-
-### Slide Up
-Moves from 100px below to final position
-```typescript
-const slideUp = interpolate(springValue, [0, 1], [100, 0]);
-// Apply: transform: `translateY(${slideUp}px)`
-```
-
-### Slide Down
-Moves from 100px above to final position
-```typescript
-const slideDown = interpolate(springValue, [0, 1], [-100, 0]);
-```
-
-### Slide Left
-Enters from right side
-```typescript
-const slideLeft = interpolate(springValue, [0, 1], [100, 0]);
-// Apply: transform: `translateX(${slideLeft}px)`
-```
-
-### Slide Right
-Enters from left side
-```typescript
-const slideRight = interpolate(springValue, [0, 1], [-100, 0]);
-```
-
-### Scale In
-Grows from 80% to 100%
-```typescript
-const scaleIn = interpolate(springValue, [0, 1], [0.8, 1]);
-// Apply: transform: `scale(${scaleIn})`
-```
-
-### Scale Pop
-Grows from 0 with slight overshoot (use bouncy spring)
-```typescript
-const scalePop = interpolate(bouncySpring, [0, 1], [0, 1]);
-```
-
-### Rotation
-Full 360-degree rotation over video duration
-```typescript
-const rotation = interpolate(frame, [0, durationInFrames], [0, 360]);
-// Apply: transform: `rotate(${rotation}deg)`
-```
-
-## Stagger Patterns
-
-### Word-by-Word (Headlines)
-5 frames between each word
-```typescript
-const words = text.split(" ");
-{words.map((word, index) => {
-  const delay = index * 5;
-  const scale = spring({
-    fps,
-    frame: frame - delay,
-    config: { damping: 200 },
-  });
   return (
-    <span
-      key={index}
-      style={{
-        display: "inline-block",
-        marginRight: 10,
-        transform: `scale(${scale})`,
-      }}
-    >
-      {word}
+    <div style={{
+      opacity,
+      transform: `translateY(${translateY}px) scale(${scale})`,
+    }}>
+      Content
+    </div>
+  );
+};
+```
+
+### With Delays
+
+```typescript
+const AnimatedItem = ({ index }: { index: number }) => {
+  const frame = useCurrentFrame();
+
+  // 5-frame stagger per item
+  const delay = index * 5;
+  const animationStart = Math.max(0, frame - delay);
+  const progress = Math.min(animationStart / 20, 1);
+
+  const easedProgress = easeOutBack(progress);
+
+  return (
+    <div style={{
+      opacity: interpolate(easedProgress, [0, 1], [0, 1]),
+      transform: `scale(${interpolate(easedProgress, [0, 1], [0.5, 1])})`,
+    }}>
+      Item {index}
+    </div>
+  );
+};
+```
+
+## Stagger Systems
+
+### Linear Stagger
+
+```typescript
+const STAGGER_FRAMES = 5;
+
+{items.map((item, i) => {
+  const delay = i * STAGGER_FRAMES;
+  const progress = Math.min(Math.max(0, frame - delay) / 20, 1);
+  const eased = easeOutExpo(progress);
+  // ...
+})}
+```
+
+### Exponential Stagger (Accelerating)
+
+```typescript
+{items.map((item, i) => {
+  // Delays get shorter: 0, 8, 14, 18, 20, 21...
+  const delay = Math.floor(20 * (1 - Math.pow(0.8, i)));
+  // ...
+})}
+```
+
+### Wave Stagger (Grouped)
+
+```typescript
+{items.map((item, i) => {
+  // Group items in waves of 3
+  const wave = Math.floor(i / 3);
+  const positionInWave = i % 3;
+  const delay = wave * 15 + positionInWave * 3;
+  // ...
+})}
+```
+
+### From-Center Stagger
+
+```typescript
+{items.map((item, i) => {
+  const center = items.length / 2;
+  const distanceFromCenter = Math.abs(i - center);
+  const delay = distanceFromCenter * 5;
+  // Center items animate first
+})}
+```
+
+## Remotion Spring Configuration Presets
+
+These map roughly to GSAP spring behaviors:
+
+```typescript
+import { spring } from "remotion";
+
+// ═══════════════════════════════════════════════════════════════
+// SPRING PRESETS
+// ═══════════════════════════════════════════════════════════════
+
+/** Snappy - Quick UI responses */
+export const springSnappy = {
+  damping: 200,
+  mass: 0.5,
+  stiffness: 200,
+};
+
+/** Smooth - Professional text reveals */
+export const springSmooth = {
+  damping: 100,
+  mass: 1,
+  stiffness: 100,
+};
+
+/** Bouncy - Playful emphasis */
+export const springBouncy = {
+  damping: 12,
+  mass: 1,
+  stiffness: 100,
+};
+
+/** Gentle - Ambient background motion */
+export const springGentle = {
+  damping: 100,
+  mass: 3,
+  stiffness: 50,
+};
+
+/** Heavy - Large graphic reveals */
+export const springHeavy = {
+  damping: 50,
+  mass: 5,
+  stiffness: 80,
+};
+
+/** Wobbly - Attention-grabbing */
+export const springWobbly = {
+  damping: 8,
+  mass: 1,
+  stiffness: 150,
+};
+
+// Usage:
+const value = spring({
+  frame,
+  fps,
+  config: springSnappy,
+});
+```
+
+## Motion Patterns
+
+### Reveal with Scale + Fade
+
+```typescript
+const RevealWithScale = () => {
+  const frame = useCurrentFrame();
+  const progress = Math.min(frame / 25, 1);
+  const eased = easeOutExpo(progress);
+
+  return (
+    <div style={{
+      opacity: eased,
+      transform: `scale(${0.9 + 0.1 * eased})`,
+      filter: `blur(${(1 - eased) * 5}px)`,
+    }}>
+      Content
+    </div>
+  );
+};
+```
+
+### Slide Up with Overshoot
+
+```typescript
+const SlideUpOvershoot = () => {
+  const frame = useCurrentFrame();
+  const progress = Math.min(frame / 30, 1);
+  const eased = easeOutBack(progress);
+
+  return (
+    <div style={{
+      opacity: Math.min(progress * 2, 1), // Fade in faster
+      transform: `translateY(${(1 - eased) * 60}px)`,
+    }}>
+      Content
+    </div>
+  );
+};
+```
+
+### Horizontal Wipe Reveal
+
+```typescript
+const WipeReveal = () => {
+  const frame = useCurrentFrame();
+  const progress = Math.min(frame / 20, 1);
+  const eased = easeOutExpo(progress);
+
+  return (
+    <div style={{
+      clipPath: `inset(0 ${(1 - eased) * 100}% 0 0)`,
+    }}>
+      Content that reveals from left
+    </div>
+  );
+};
+```
+
+### Mask Reveal (Bottom to Top)
+
+```typescript
+const MaskRevealUp = () => {
+  const frame = useCurrentFrame();
+  const progress = Math.min(frame / 25, 1);
+  const eased = easeOutCubic(progress);
+
+  return (
+    <div style={{ overflow: 'hidden' }}>
+      <div style={{
+        transform: `translateY(${(1 - eased) * 100}%)`,
+      }}>
+        Content slides up into view
+      </div>
+    </div>
+  );
+};
+```
+
+### Staggered Character Animation
+
+```typescript
+const SplitText = ({ text }: { text: string }) => {
+  const frame = useCurrentFrame();
+  const chars = text.split('');
+
+  return (
+    <span>
+      {chars.map((char, i) => {
+        const delay = i * 2; // 2 frames per character
+        const progress = Math.min(Math.max(0, frame - delay) / 15, 1);
+        const eased = easeOutExpo(progress);
+
+        return (
+          <span
+            key={i}
+            style={{
+              display: 'inline-block',
+              opacity: eased,
+              transform: `translateY(${(1 - eased) * 20}px)`,
+            }}
+          >
+            {char === ' ' ? '\u00A0' : char}
+          </span>
+        );
+      })}
     </span>
   );
-})}
-```
-
-### Bullet Points (Lists)
-15 frames (0.5s) between each item
-```typescript
-{items.map((item, index) => {
-  const delay = index * 15;
-  const progress = spring({
-    fps,
-    frame: frame - delay,
-    config: { damping: 100 },
-  });
-  const opacity = interpolate(progress, [0, 1], [0, 1]);
-  const translateX = interpolate(progress, [0, 1], [-30, 0]);
-
-  return (
-    <div
-      key={index}
-      style={{
-        opacity,
-        transform: `translateX(${translateX}px)`,
-      }}
-    >
-      {item}
-    </div>
-  );
-})}
-```
-
-### Cards (Grid Items)
-20 frames between items, from different directions
-```typescript
-{cards.map((card, index) => {
-  const delay = index * 20;
-  const progress = spring({
-    fps,
-    frame: frame - delay,
-    config: { damping: 100 },
-  });
-  const scale = interpolate(progress, [0, 1], [0.8, 1]);
-  const opacity = interpolate(progress, [0, 1], [0, 1]);
-
-  return (
-    <div
-      key={index}
-      style={{
-        opacity,
-        transform: `scale(${scale})`,
-      }}
-    >
-      {card}
-    </div>
-  );
-})}
-```
-
-## Transition Presets
-
-### Cross Fade
-Two elements, one fading out while other fades in
-```typescript
-const transitionStart = 60; // Frame where transition starts
-const transitionDuration = 30;
-
-const outOpacity = interpolate(
-  frame,
-  [transitionStart, transitionStart + transitionDuration],
-  [1, 0],
-  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-);
-
-const inOpacity = interpolate(
-  frame,
-  [transitionStart, transitionStart + transitionDuration],
-  [0, 1],
-  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-);
-```
-
-### Slide Transition
-Current slide exits left, new slide enters from right
-```typescript
-const slideOutX = interpolate(progress, [0, 1], [0, -width]);
-const slideInX = interpolate(progress, [0, 1], [width, 0]);
-```
-
-### Scale Transition
-Current slide scales down, new slide scales up
-```typescript
-const scaleOut = interpolate(progress, [0, 1], [1, 0.8]);
-const opacityOut = interpolate(progress, [0, 1], [1, 0]);
-
-const scaleIn = interpolate(progress, [0, 1], [1.2, 1]);
-const opacityIn = interpolate(progress, [0, 1], [0, 1]);
+};
 ```
 
 ## Timing Constants
 
 ```typescript
-// Standard durations (at 30fps)
-const FADE_DURATION = 30;      // 1 second
-const QUICK_FADE = 15;         // 0.5 seconds
-const WORD_STAGGER = 5;        // 5 frames between words
-const BULLET_STAGGER = 15;     // 15 frames between bullets
-const CARD_STAGGER = 20;       // 20 frames between cards
-const TRANSITION_DURATION = 30; // 1 second transition
+// Frame counts at 30fps
+export const TIMING = {
+  // Entrance durations
+  instant: 1,
+  micro: 5,        // ~0.17s
+  fast: 10,        // ~0.33s
+  normal: 15,      // 0.5s
+  moderate: 20,    // ~0.67s
+  slow: 30,        // 1s
+  dramatic: 45,    // 1.5s
 
-// Slide durations
-const TITLE_DURATION = 90;     // 3 seconds
-const CONTENT_DURATION = 150;  // 5 seconds
-const OUTRO_DURATION = 90;     // 3 seconds
+  // Stagger intervals
+  staggerTight: 3,
+  staggerNormal: 5,
+  staggerLoose: 8,
+  staggerWide: 12,
+
+  // Hold durations (reading time)
+  holdBrief: 30,   // 1s
+  holdNormal: 45,  // 1.5s
+  holdLong: 60,    // 2s
+
+  // Exit (usually faster than entrance)
+  exitMultiplier: 0.7,
+};
 ```
+
+## Easing Selection Guide
+
+| Context | Recommended Easing |
+|---------|-------------------|
+| Hero text reveal | `easeOutExpo` |
+| Supporting text | `easeOutCubic` |
+| Buttons/icons | `easeOutBack` |
+| Scene transitions | `easeInOutCubic` |
+| Emphasis moments | `easeOutElastic` |
+| Background elements | `easeOutSine` |
+| Notifications | `easeOutBack` + `springWobbly` |
+| Data/stats | `easeOutExpo` |
+| Exit animations | `easeInCubic` (faster) |
+| Loops/ambient | `easeInOutSine` |

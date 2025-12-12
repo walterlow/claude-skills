@@ -1,202 +1,623 @@
 /**
  * TransitionSlide Component Template
  *
- * Smooth transitions between content sections.
+ * Signature transition effects between content sections.
  * Duration: 30 frames (1 second at 30fps)
  *
- * Transition types:
- * - fade: Simple cross-fade
- * - slide: Horizontal slide
- * - scale: Scale with fade
- * - wipe: Diagonal wipe effect
+ * Transition Types:
+ * - morph: Smooth shape morphing with color shift
+ * - flash: Dramatic light flash with fade
+ * - wipe: Diagonal/horizontal wipe reveal
+ * - zoom: Scale through with blur
+ * - glitch: Digital distortion effect
+ * - particles: Dissolve into particles
  */
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   AbsoluteFill,
   interpolate,
-  spring,
   useCurrentFrame,
   useVideoConfig,
   random,
 } from "remotion";
 
-type TransitionType = "fade" | "slide" | "scale" | "wipe";
+// ═══════════════════════════════════════════════════════════════
+// GSAP-INSPIRED EASING FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+
+const easeOutExpo = (t: number): number =>
+  t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+
+const easeInExpo = (t: number): number =>
+  t === 0 ? 0 : Math.pow(2, 10 * t - 10);
+
+const easeInOutExpo = (t: number): number =>
+  t === 0 ? 0 :
+  t === 1 ? 1 :
+  t < 0.5 ? Math.pow(2, 20 * t - 10) / 2 :
+  (2 - Math.pow(2, -20 * t + 10)) / 2;
+
+const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+
+const easeInOutCubic = (t: number): number =>
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+// ═══════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════
+
+type TransitionType = "morph" | "flash" | "wipe" | "zoom" | "glitch" | "particles";
 
 interface TransitionSlideProps {
-  transitionType?: TransitionType;
-  primaryColor: string;
-  secondaryColor: string;
+  type?: TransitionType;
+  primaryColor?: string;
+  secondaryColor?: string;
   backgroundColor?: string;
+  direction?: "left" | "right" | "up" | "down" | "diagonal";
 }
 
-export const TransitionSlide: React.FC<TransitionSlideProps> = ({
-  transitionType = "fade",
-  primaryColor,
-  secondaryColor,
-  backgroundColor = "#1E293B",
-}) => {
+// ═══════════════════════════════════════════════════════════════
+// TRANSITION COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+
+/** Morph transition - smooth shape with color shift */
+const MorphTransition: React.FC<{
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+}> = ({ primaryColor, secondaryColor, backgroundColor }) => {
   const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
-  const [gradientId] = useState(() => String(random(null)));
+  const { width, height, durationInFrames } = useVideoConfig();
+  const [gradientId] = useState(() => `morph-${random(null)}`);
 
-  // Progress through transition (0 to 1)
-  const progress = spring({
-    frame,
-    fps,
-    config: { damping: 100, mass: 0.8 },
-  });
+  const progress = frame / durationInFrames;
+  const eased = easeInOutExpo(progress);
 
-  // Fade transition
-  if (transitionType === "fade") {
-    const opacity = interpolate(
-      frame,
-      [0, 15, 15, 30],
-      [1, 0.3, 0.3, 1],
-      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-    );
+  // Morphing circle that expands and contracts
+  const phase1 = Math.min(progress * 2, 1); // First half: expand
+  const phase2 = Math.max((progress - 0.5) * 2, 0); // Second half: contract
 
-    return (
-      <AbsoluteFill style={{ backgroundColor, opacity }}>
-        <AbsoluteFill
-          style={{
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          {/* Animated gradient circle */}
-          <svg
-            viewBox={`0 0 200 200`}
+  const radius = phase1 < 1
+    ? easeOutExpo(phase1) * 80
+    : 80 - easeInExpo(phase2) * 80;
+
+  // Color shift during transition
+  const colorProgress = easeInOutCubic(progress);
+
+  return (
+    <AbsoluteFill style={{ backgroundColor }}>
+      {/* Animated gradient background */}
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(circle at 50% 50%,
+            ${primaryColor}${Math.round((0.3 + Math.sin(frame * 0.2) * 0.1) * 255).toString(16).padStart(2, '0')} 0%,
+            transparent 60%
+          )`,
+        }}
+      />
+
+      {/* Central morphing shape */}
+      <AbsoluteFill
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <svg width={300} height={300} viewBox="0 0 300 300">
+          <defs>
+            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop
+                offset="0%"
+                stopColor={primaryColor}
+                style={{ transition: "stop-color 0.3s" }}
+              />
+              <stop
+                offset="100%"
+                stopColor={secondaryColor}
+                style={{ transition: "stop-color 0.3s" }}
+              />
+            </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="8" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Morphing circle */}
+          <circle
+            cx={150}
+            cy={150}
+            r={radius}
+            fill={`url(#${gradientId})`}
+            filter="url(#glow)"
             style={{
-              width: 100,
-              height: 100,
-              opacity: interpolate(frame, [0, 15, 15, 30], [0, 1, 1, 0]),
-            }}
-          >
-            <defs>
-              <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor={primaryColor} />
-                <stop offset="100%" stopColor={secondaryColor} />
-              </linearGradient>
-            </defs>
-            <circle
-              cx={100}
-              cy={100}
-              r={interpolate(progress, [0, 1], [20, 50])}
-              fill={`url(#${gradientId})`}
-            />
-          </svg>
-        </AbsoluteFill>
-      </AbsoluteFill>
-    );
-  }
-
-  // Slide transition
-  if (transitionType === "slide") {
-    const slideX = interpolate(progress, [0, 1], [-width, 0]);
-
-    return (
-      <AbsoluteFill style={{ backgroundColor }}>
-        <AbsoluteFill
-          style={{
-            transform: `translateX(${slideX}px)`,
-          }}
-        >
-          <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "100%" }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor={primaryColor} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={secondaryColor} stopOpacity={0.1} />
-              </linearGradient>
-            </defs>
-            <rect fill={`url(#${gradientId})`} width={width} height={height} />
-          </svg>
-        </AbsoluteFill>
-      </AbsoluteFill>
-    );
-  }
-
-  // Scale transition
-  if (transitionType === "scale") {
-    const scale = interpolate(progress, [0, 0.5, 1], [1, 1.1, 1]);
-    const opacity = interpolate(
-      frame,
-      [0, 10, 20, 30],
-      [1, 0.5, 0.5, 1],
-      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-    );
-
-    return (
-      <AbsoluteFill style={{ backgroundColor, opacity }}>
-        <AbsoluteFill
-          style={{
-            transform: `scale(${scale})`,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          {/* Pulsing ring */}
-          <svg viewBox="0 0 200 200" style={{ width: 150, height: 150 }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor={primaryColor} />
-                <stop offset="100%" stopColor={secondaryColor} />
-              </linearGradient>
-            </defs>
-            <circle
-              cx={100}
-              cy={100}
-              r={60}
-              fill="none"
-              stroke={`url(#${gradientId})`}
-              strokeWidth={4}
-              strokeDasharray={377}
-              strokeDashoffset={interpolate(progress, [0, 1], [377, 0])}
-              strokeLinecap="round"
-            />
-          </svg>
-        </AbsoluteFill>
-      </AbsoluteFill>
-    );
-  }
-
-  // Wipe transition (diagonal)
-  if (transitionType === "wipe") {
-    const wipeProgress = interpolate(progress, [0, 1], [-100, 200]);
-
-    return (
-      <AbsoluteFill style={{ backgroundColor }}>
-        <AbsoluteFill
-          style={{
-            background: `linear-gradient(135deg,
-              ${primaryColor}30 0%,
-              ${secondaryColor}30 ${wipeProgress}%,
-              transparent ${wipeProgress + 20}%
-            )`,
-          }}
-        />
-        {/* Center dot */}
-        <AbsoluteFill
-          style={{
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <div
-            style={{
-              width: interpolate(progress, [0, 0.5, 1], [0, 20, 0]),
-              height: interpolate(progress, [0, 0.5, 1], [0, 20, 0]),
-              borderRadius: "50%",
-              background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+              transformOrigin: "center",
+              transform: `scale(${1 + Math.sin(frame * 0.15) * 0.1})`,
             }}
           />
-        </AbsoluteFill>
+
+          {/* Orbiting dots */}
+          {[0, 1, 2].map((i) => {
+            const angle = (frame * 0.05 + (i * Math.PI * 2) / 3);
+            const orbitRadius = 100 + Math.sin(frame * 0.1) * 20;
+            const x = 150 + Math.cos(angle) * orbitRadius;
+            const y = 150 + Math.sin(angle) * orbitRadius;
+            const dotOpacity = 0.3 + Math.sin(frame * 0.1 + i) * 0.2;
+
+            return (
+              <circle
+                key={i}
+                cx={x}
+                cy={y}
+                r={6}
+                fill={i % 2 === 0 ? primaryColor : secondaryColor}
+                opacity={dotOpacity}
+              />
+            );
+          })}
+        </svg>
       </AbsoluteFill>
-    );
+    </AbsoluteFill>
+  );
+};
+
+/** Flash transition - dramatic light burst */
+const FlashTransition: React.FC<{
+  primaryColor: string;
+  backgroundColor: string;
+}> = ({ primaryColor, backgroundColor }) => {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+
+  const progress = frame / durationInFrames;
+
+  // Flash curve: quick bright, slower fade
+  let flashIntensity = 0;
+  if (progress < 0.3) {
+    // Ramp up
+    flashIntensity = easeOutExpo(progress / 0.3);
+  } else if (progress < 0.5) {
+    // Peak hold
+    flashIntensity = 1;
+  } else {
+    // Fade out
+    flashIntensity = 1 - easeOutCubic((progress - 0.5) / 0.5);
   }
 
-  // Default fallback
-  return <AbsoluteFill style={{ backgroundColor }} />;
+  // Background opacity inverse of flash
+  const bgOpacity = 1 - flashIntensity * 0.7;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor }}>
+      {/* Background with reduced opacity during flash */}
+      <AbsoluteFill style={{ opacity: bgOpacity }} />
+
+      {/* Flash layer */}
+      <AbsoluteFill
+        style={{
+          backgroundColor: "#FFFFFF",
+          opacity: flashIntensity * 0.9,
+          mixBlendMode: "overlay",
+        }}
+      />
+
+      {/* Color tint during flash */}
+      <AbsoluteFill
+        style={{
+          backgroundColor: primaryColor,
+          opacity: flashIntensity * 0.3,
+          mixBlendMode: "screen",
+        }}
+      />
+
+      {/* Radial burst */}
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(circle at center,
+            rgba(255,255,255,${flashIntensity * 0.8}) 0%,
+            rgba(255,255,255,${flashIntensity * 0.4}) 30%,
+            transparent 70%
+          )`,
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
+/** Wipe transition - directional reveal */
+const WipeTransition: React.FC<{
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+  direction: "left" | "right" | "up" | "down" | "diagonal";
+}> = ({ primaryColor, secondaryColor, backgroundColor, direction }) => {
+  const frame = useCurrentFrame();
+  const { width, height, durationInFrames } = useVideoConfig();
+  const [gradientId] = useState(() => `wipe-${random(null)}`);
+
+  const progress = frame / durationInFrames;
+  const eased = easeInOutExpo(progress);
+
+  // Calculate wipe position based on direction
+  let clipPath = "";
+  let glowPosition = { x: "50%", y: "50%" };
+
+  switch (direction) {
+    case "left":
+      clipPath = `inset(0 ${(1 - eased) * 100}% 0 0)`;
+      glowPosition = { x: `${eased * 100}%`, y: "50%" };
+      break;
+    case "right":
+      clipPath = `inset(0 0 0 ${(1 - eased) * 100}%)`;
+      glowPosition = { x: `${(1 - eased) * 100}%`, y: "50%" };
+      break;
+    case "up":
+      clipPath = `inset(${(1 - eased) * 100}% 0 0 0)`;
+      glowPosition = { x: "50%", y: `${eased * 100}%` };
+      break;
+    case "down":
+      clipPath = `inset(0 0 ${(1 - eased) * 100}% 0)`;
+      glowPosition = { x: "50%", y: `${(1 - eased) * 100}%` };
+      break;
+    case "diagonal":
+    default:
+      const diagProgress = eased * 200 - 50;
+      clipPath = `polygon(${diagProgress}% 0%, 100% 0%, 100% 100%, ${diagProgress - 50}% 100%)`;
+      glowPosition = { x: `${50 + (eased - 0.5) * 100}%`, y: "50%" };
+  }
+
+  return (
+    <AbsoluteFill style={{ backgroundColor }}>
+      {/* Wipe overlay */}
+      <AbsoluteFill
+        style={{
+          clipPath,
+        }}
+      >
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <defs>
+            <linearGradient
+              id={gradientId}
+              x1={direction === "diagonal" ? "0%" : "50%"}
+              y1="0%"
+              x2={direction === "diagonal" ? "100%" : "50%"}
+              y2="100%"
+            >
+              <stop offset="0%" stopColor={primaryColor} stopOpacity={0.4} />
+              <stop offset="50%" stopColor={secondaryColor} stopOpacity={0.2} />
+              <stop offset="100%" stopColor={primaryColor} stopOpacity={0.1} />
+            </linearGradient>
+          </defs>
+          <rect fill={`url(#${gradientId})`} width={width} height={height} />
+        </svg>
+      </AbsoluteFill>
+
+      {/* Edge glow following wipe */}
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(ellipse at ${glowPosition.x} ${glowPosition.y},
+            ${primaryColor}60 0%,
+            transparent 40%
+          )`,
+          filter: "blur(20px)",
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
+/** Zoom transition - scale through with motion blur */
+const ZoomTransition: React.FC<{
+  primaryColor: string;
+  backgroundColor: string;
+}> = ({ primaryColor, backgroundColor }) => {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+
+  const progress = frame / durationInFrames;
+
+  // Zoom in first half, zoom out second half
+  let scale = 1;
+  let blur = 0;
+  let opacity = 1;
+
+  if (progress < 0.5) {
+    const phase = easeInExpo(progress * 2);
+    scale = 1 + phase * 0.5;
+    blur = phase * 15;
+    opacity = 1 - phase * 0.3;
+  } else {
+    const phase = easeOutExpo((progress - 0.5) * 2);
+    scale = 1.5 - phase * 0.5;
+    blur = 15 - phase * 15;
+    opacity = 0.7 + phase * 0.3;
+  }
+
+  return (
+    <AbsoluteFill style={{ backgroundColor }}>
+      <AbsoluteFill
+        style={{
+          transform: `scale(${scale})`,
+          filter: `blur(${blur}px)`,
+          opacity,
+        }}
+      >
+        {/* Radial lines suggesting motion */}
+        <AbsoluteFill
+          style={{
+            background: `
+              repeating-conic-gradient(
+                from 0deg at 50% 50%,
+                ${primaryColor}10 0deg 5deg,
+                transparent 5deg 15deg
+              )
+            `,
+            opacity: blur / 15,
+          }}
+        />
+      </AbsoluteFill>
+
+      {/* Central focus point */}
+      <AbsoluteFill
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
+            width: 20 - blur,
+            height: 20 - blur,
+            borderRadius: "50%",
+            backgroundColor: primaryColor,
+            boxShadow: `0 0 ${30 + blur}px ${primaryColor}`,
+            opacity: Math.abs(progress - 0.5) * 2,
+          }}
+        />
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+/** Glitch transition - digital distortion */
+const GlitchTransition: React.FC<{
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+}> = ({ primaryColor, secondaryColor, backgroundColor }) => {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+
+  const progress = frame / durationInFrames;
+
+  // Glitch intensity peaks in middle
+  const glitchIntensity =
+    progress < 0.5
+      ? easeOutCubic(progress * 2)
+      : easeOutCubic((1 - progress) * 2);
+
+  // Random-ish offset based on frame
+  const offset1 = Math.sin(frame * 1.5) * 20 * glitchIntensity;
+  const offset2 = Math.cos(frame * 2.3) * 15 * glitchIntensity;
+  const offset3 = Math.sin(frame * 3.7) * 25 * glitchIntensity;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor }}>
+      {/* Scanlines */}
+      <AbsoluteFill
+        style={{
+          backgroundImage: `repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(0,0,0,${0.1 * glitchIntensity}) 2px,
+            rgba(0,0,0,${0.1 * glitchIntensity}) 4px
+          )`,
+          backgroundPosition: `0 ${frame % 4}px`,
+        }}
+      />
+
+      {/* RGB split layers */}
+      <AbsoluteFill
+        style={{
+          backgroundColor: primaryColor,
+          mixBlendMode: "screen",
+          opacity: 0.3 * glitchIntensity,
+          transform: `translateX(${offset1}px)`,
+        }}
+      />
+      <AbsoluteFill
+        style={{
+          backgroundColor: secondaryColor,
+          mixBlendMode: "screen",
+          opacity: 0.3 * glitchIntensity,
+          transform: `translateX(${-offset2}px)`,
+        }}
+      />
+
+      {/* Glitch bars */}
+      {glitchIntensity > 0.3 && (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: `${30 + offset1}%`,
+              height: 4,
+              backgroundColor: primaryColor,
+              opacity: glitchIntensity,
+              transform: `translateX(${offset3}px)`,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: `${70 - offset2}%`,
+              height: 2,
+              backgroundColor: secondaryColor,
+              opacity: glitchIntensity * 0.7,
+              transform: `translateX(${-offset1}px)`,
+            }}
+          />
+        </>
+      )}
+
+      {/* Static noise */}
+      <AbsoluteFill
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' seed='${frame}'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          opacity: 0.05 * glitchIntensity,
+          mixBlendMode: "overlay",
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
+/** Particles transition - dissolve effect */
+const ParticlesTransition: React.FC<{
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+}> = ({ primaryColor, secondaryColor, backgroundColor }) => {
+  const frame = useCurrentFrame();
+  const { width, height, durationInFrames } = useVideoConfig();
+
+  const progress = frame / durationInFrames;
+
+  // Generate particles
+  const particles = useMemo(() => {
+    return Array.from({ length: 60 }, (_, i) => ({
+      x: random(`px-${i}`) * width,
+      y: random(`py-${i}`) * height,
+      size: 4 + random(`ps-${i}`) * 8,
+      speed: 0.5 + random(`psp-${i}`) * 1.5,
+      color: random(`pc-${i}`) > 0.5 ? primaryColor : secondaryColor,
+      delay: random(`pd-${i}`) * 0.3,
+    }));
+  }, [width, height, primaryColor, secondaryColor]);
+
+  return (
+    <AbsoluteFill style={{ backgroundColor }}>
+      {particles.map((particle, i) => {
+        // Staggered appearance and disappearance
+        const particleProgress = Math.max(0, Math.min(1,
+          (progress - particle.delay) / (1 - particle.delay)
+        ));
+
+        // Particles rise and fade
+        const yOffset = particleProgress * particle.speed * 100;
+        const scale = Math.sin(particleProgress * Math.PI); // Grow then shrink
+        const opacity = scale;
+
+        // Drift
+        const xDrift = Math.sin((frame + i * 10) * 0.05) * 20;
+
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: particle.x + xDrift,
+              top: particle.y - yOffset,
+              width: particle.size,
+              height: particle.size,
+              borderRadius: "50%",
+              backgroundColor: particle.color,
+              opacity,
+              transform: `scale(${scale})`,
+              boxShadow: `0 0 ${particle.size * 2}px ${particle.color}`,
+            }}
+          />
+        );
+      })}
+
+      {/* Central glow */}
+      <AbsoluteFill
+        style={{
+          background: `radial-gradient(circle at center,
+            ${primaryColor}${Math.round(Math.sin(progress * Math.PI) * 0.2 * 255).toString(16).padStart(2, '0')} 0%,
+            transparent 50%
+          )`,
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════
+
+export const TransitionSlide: React.FC<TransitionSlideProps> = ({
+  type = "morph",
+  primaryColor = "#6366F1",
+  secondaryColor = "#8B5CF6",
+  backgroundColor = "#0A0A0F",
+  direction = "diagonal",
+}) => {
+  switch (type) {
+    case "flash":
+      return (
+        <FlashTransition
+          primaryColor={primaryColor}
+          backgroundColor={backgroundColor}
+        />
+      );
+    case "wipe":
+      return (
+        <WipeTransition
+          primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
+          backgroundColor={backgroundColor}
+          direction={direction}
+        />
+      );
+    case "zoom":
+      return (
+        <ZoomTransition
+          primaryColor={primaryColor}
+          backgroundColor={backgroundColor}
+        />
+      );
+    case "glitch":
+      return (
+        <GlitchTransition
+          primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
+          backgroundColor={backgroundColor}
+        />
+      );
+    case "particles":
+      return (
+        <ParticlesTransition
+          primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
+          backgroundColor={backgroundColor}
+        />
+      );
+    case "morph":
+    default:
+      return (
+        <MorphTransition
+          primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
+          backgroundColor={backgroundColor}
+        />
+      );
+  }
 };
 
 export default TransitionSlide;
