@@ -7,14 +7,218 @@ description: Analyze repositories to detect tech stacks, dependencies, and servi
 
 This skill analyzes codebases to automatically generate Docker configurations for containerized deployment.
 
+## Critical Docker Best Practices (MUST FOLLOW)
+
+### 1. NEVER Use `latest` Tag
+
+**WRONG:**
+```dockerfile
+FROM node:latest
+FROM python:latest
+FROM nginx:latest
+```
+
+**RIGHT:**
+```dockerfile
+FROM node:20.11.1-alpine3.19
+FROM python:3.12.2-slim-bookworm
+FROM nginx:1.25.4-alpine3.19
+```
+
+`latest` is a moving target. What works today may break tomorrow when the base image updates. Production deployments have failed due to unexpected base image changes. Pin versions for reproducible builds.
+
+### 2. Use Minimal Base Images
+
+Bloated images = larger attack surface, slower pulls, higher storage costs.
+
+| Instead of | Use | Size Reduction |
+|------------|-----|----------------|
+| `ubuntu:22.04` | `python:3.12-slim` | ~90% smaller |
+| `node:20` | `node:20-alpine` | ~80% smaller |
+| `python:3.12` | `python:3.12-slim` | ~85% smaller |
+
+For production, consider distroless images where possible.
+
+### 3. NEVER Put Secrets in Dockerfiles
+
+**CATASTROPHICALLY WRONG:**
+```dockerfile
+ENV AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+ENV AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/...
+ARG NPM_TOKEN=abc123
+```
+
+Secrets baked into images are extractable by anyone with image access. They persist in layer history, registries, and CI logs.
+
+**CORRECT - Use BuildKit secret mounts for build-time secrets:**
+```dockerfile
+# Secret available during build but NOT persisted in layer
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm ci
+```
+
+**CORRECT - Pass secrets at runtime:**
+```bash
+docker run -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID myapp
+```
+
+**CORRECT - Use secrets management:**
+- Docker Swarm secrets
+- Kubernetes secrets
+- HashiCorp Vault, AWS Secrets Manager
+
+### 4. Optimize Layer Caching
+
+Order by change frequency (least → most). Wrong order means npm/pip install runs from scratch on every code change.
+
+**WRONG (cache invalidated on ANY file change):**
+```dockerfile
+COPY . .
+RUN npm install
+```
+
+**RIGHT (npm install cached unless package.json changes):**
+```dockerfile
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+```
+
+This single change can cut build times from 8 minutes to under 1 minute.
+
+### 5. Combine RUN Commands
+
+Each instruction creates a layer. Cleanup in a later layer doesn't save space.
+
+**WRONG (4 layers, cleanup doesn't work):**
+```dockerfile
+RUN apt-get update
+RUN apt-get install -y curl
+RUN apt-get install -y wget
+RUN apt-get clean
+```
+
+**RIGHT (1 layer, cleanup actually saves space):**
+```dockerfile
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      curl \
+      wget \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+Use `--no-install-recommends` to skip suggested packages you don't need.
+
+### 6. Run as Non-Root User
+
+Default Docker containers run as root. Combined with a container escape vulnerability, this could compromise your host.
+
+**WRONG:**
+```dockerfile
+CMD ["node", "server.js"]  # Runs as root
+```
+
+**RIGHT:**
+```dockerfile
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+COPY --chown=appuser:appgroup . .
+USER appuser
+CMD ["node", "server.js"]
+```
+
+### 7. Always Include Health Checks
+
+Without health checks, your orchestrator has no idea if your app is actually working vs stuck in a crash loop.
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+```
+
+Key points:
+- `--start-period` gives your app time to initialize
+- Check something meaningful (DB connectivity, not just "process exists")
+- Keep checks lightweight (they run frequently)
+
+### 8. Use Multi-Stage for Dev vs Prod
+
+Don't ship debug tools, test suites, or dev dependencies to production.
+
+```dockerfile
+# Base stage
+FROM node:20.11-alpine AS base
+WORKDIR /app
+COPY package*.json ./
+
+# Development stage (with dev tools)
+FROM base AS development
+RUN npm install
+COPY . .
+CMD ["npm", "run", "dev"]
+
+# Builder stage
+FROM base AS builder
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+
+# Production stage (minimal)
+FROM node:20.11-alpine AS production
+WORKDIR /app
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+COPY --from=builder --chown=appuser:appgroup /app/dist ./dist
+COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
+USER appuser
+EXPOSE 3000
+CMD ["node", "dist/index.js"]
+```
+
+Build with target: `docker build --target production -t myapp:prod .`
+
+### 9. Scan Images Regularly
+
+That base image from last year has known CVEs. Update deliberately, not never.
+
+```bash
+# Docker Scout
+docker scout cves myapp:latest
+
+# Trivy
+trivy image myapp:latest
+```
+
+Set up automated scanning in CI. Block deployments on critical vulnerabilities. Update base images monthly/quarterly with intentional testing.
+
+### 10. Always Use .dockerignore
+
+Without it, you're uploading your entire directory (including `.git`, `node_modules`, `.env` files) to the Docker daemon.
+
+```
+.git
+node_modules
+npm-debug.log
+.env
+.env.*
+coverage
+.nyc_output
+*.md
+.vscode
+.idea
+tests
+__tests__
+```
+
+Be aggressive. If it's not needed in the final image, exclude it.
+
+---
+
 ## When to Use
 
 - User asks to "dockerize" a project or repository
 - User needs a Dockerfile or compose.yml
 - User wants to containerize their application
 - User asks how to run their project in Docker
-- User needs to set up a development environment with Docker
-
+- User needs to set up a development environment image with Docker
+- User needs to set up a product environment image with Docker
 ## Analysis Workflow
 
 ### Step 1: Analyze Repository Structure
@@ -160,7 +364,7 @@ target/
 ```
 
 **For development, optionally create:**
-- `compose.override.yml` for dev-specific settings
+- `compose.yml` for dev-specific settings
 - `compose.prod.yml` for production configuration
 
 ## Output Format
